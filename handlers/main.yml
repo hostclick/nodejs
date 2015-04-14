@@ -1,0 +1,2 @@
+- name: restart sinopia
+  shell: /etc/init.d/sinopia restart

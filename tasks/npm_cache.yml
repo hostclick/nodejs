@@ -1,0 +1,19 @@
+- name: Configure Sinopia npm cache service
+  template: src=config.yaml.j2 dest=/root/config.yaml
+  notify: restart sinopia
+
+#- name: Start Sinopia npm cache service
+#  shell: /etc/init.d/sinopia start
+
+- name: Ensure Sinopia npm cache service is started
+  service: name=sinopia state=running
+
+- name: Test npm cache service registry
+  command: npm config get registry
+  register: registry
+  tags: nodejs 
+
+- name: Configure npm to use local Sinopia cache service
+  shell: npm config set registry http://{{ npm_cache_listen_ip }}:{{ npm_cache_listen_port }}/ -g
+  when: registry.stdout.find('http://{{ npm_cache_listen_ip }}:{{ npm_cache_listen_port }}/') == -1
+ 

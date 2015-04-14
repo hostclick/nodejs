@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# chkconfig: - 87 16
+# description:  NodeJs custom app
+# processname: {{ item.app_name }}
+# pidfile: /var/run/{{ item.app_name }}.pid
+#
+### BEGIN INIT INFO
+# Provides:          {{ item.app_name }}
+# Required-Start:    $local_fs $remote_fs $network $syslog $named
+# Required-Stop:     $local_fs $remote_fs $network $syslog $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start/stop my node application
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Check that networking is up.
+. /etc/sysconfig/network
+
+if [ "$NETWORKING" = "no" ]; then
+  exit 0
+fi
+
+NAME={{ item.app_name }}
+{% if item.app_path is defined %}
+{% set path = item.app_path %}
+{% else %}
+{% set path = '/share/' + item.app_name %}
+{% endif %}
+SOURCE_DIR={{ path }}
+SOURCE_FILE={{ item.app_index }}
+
+user=root
+
+RETVAL=0
+pidfile=${PIDFILE-/var/run/$NAME.pid}
+lockfile=${LOCKFILE-/var/lock/subsys/$NAME}
+
+logfile=/var/log/nodejs/$NAME.log
+forever_dir=/var/run/forever
+
+node=node
+forever=/usr/bin/forever
+sed=sed
+
+export PATH=$PATH:/usr/bin/node
+
+start() {
+  if [ ! -f "$lockfile" ] ; then
+    touch $logfile
+    chown $user $logfile
+    echo -e $"Starting ${NAME}: \n"
+	
+	#Change directory so nodejs rc can find datasource config
+	# https://github.com/dominictarr/rc/issues/37
+	pushd $SOURCE_DIR > /dev/null
+	
+    su $user -c "$forever start -p $forever_dir --pidFile $pidfile -l $logfile --append --sourceDir $SOURCE_DIR $SOURCE_FILE {{ item.app_env }}"
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch ${lockfile}
+else
+    echo "${NAME} is locked."
+    RETVAL=1
+fi
+}
+
+stop() {
+  echo -e $"Shutting down ${NAME}: \n"
+  if [ -f $pidfile ]; then
+    read pid < $pidfile
+  else
+    pid=""
+  fi
+  if [ "$pid" != "" ]; then
+	# Gnarly sed usage to obtain the foreverid.
+	foreverid=`sudo -u $user $forever list --plain | $sed -n 's/^data:\s\+\[[0-9]\+\]\s\+\(.\{4\}\)\s\+.*\s\+'$pid'\s.*/\1/p'`
+  else
+	foreverid=""
+	echo -e "${NAME} not running."
+  fi
+  if [ "$foreverid" != "" ]; then 
+	su $user -c "$forever stop -p $forever_dir $foreverid"
+	RETVAL=$?
+	echo
+	if [ $RETVAL -eq 0 ]; then
+		rm -f ${lockfile} ${pidfile}
+	fi
+  fi
+}
+
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  status)
+    status -p ${pidfile} ${NAME}
+    RETVAL=$?
+    ;;
+  restart)
+    restart
+    ;;
+  *)
+    echo "Usage:  {start|stop|status|restart}"
+    exit 1
+    ;;
+esac
+exit $RETVAL

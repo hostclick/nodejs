@@ -1,0 +1,28 @@
+- name: Create the directories for the app files
+  file: path=/share/{{ item.app_name }} state=directory owner=root group=root mode=0755
+  with_items: nodejs_apps
+
+- name: Create forever run directory
+  file: path=/var/run/forever state=directory owner=root group=root mode=0755
+
+- name: Create the directories for the app logs
+  file: path=/logs state=directory owner=root group=root mode=0755
+  tags: logs
+
+- name: Copy the app init script
+  template: src=init_file.j2 dest=/etc/init.d/{{ item.app_name }} owner=root group=root mode=0755
+  with_items: nodejs_apps
+  when: item.daemon|default('yes') != 'disable'
+  register: app_init_script
+  
+- name: Reset script startup priorities
+  shell: chkconfig {{ item.0.app_name }} resetpriorities
+  with_together:
+    - nodejs_apps
+    - app_init_script.results
+  when: item.1.changed
+
+- name: Enable nodejs apps
+  service: name={{ item.app_name }} enabled=yes
+  with_items: nodejs_apps
+  when: item.daemon|default('yes') != 'disable'
