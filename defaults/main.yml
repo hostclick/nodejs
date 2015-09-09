@@ -1,19 +1,32 @@
-nodejs_apps: none
-
 nodejs_npm_modules:
-  - forever
   - grunt
   - grunt-cli
-  - lodash
-  
+
 nodejs_modules:
   - nodejs
   - npm
   - libmcrypt-devel
-  
+
+nodejs_version: 0.10.38
+
 npm_cache: "false"
 npm_cache_server: "none"
 npm_cache_listen_ip: localhost
 npm_cache_listen_port: 4873
 npm_cache_uplink_repositories:
   - https://registry.npmjs.org/
+
+###LOG.IO
+#harvester.conf
+logio_logstreams:
+  - name: system
+    paths:
+      - /var/log/dmesg
+      - /var/log/messages
+
+#HTTP Basic Authentication
+logio_user: admin
+logio_passwd: admin
+
+logio_server_host: localhost
+logio_server_port: 28777

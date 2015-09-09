@@ -1,0 +1,82 @@
+exports.config = {
+{% if zabbix_hostname_prefix is defined %}
+  nodeName: "{{ zabbix_hostname_prefix }}_{{ ansible_hostname }}",
+{% else %}
+  nodeName: "{{ ansible_hostname }}",
+{% endif %}
+  logStreams: {
+{% set paths = '' %}
+{% for stream in logio_logstreams %}
+    {{ stream.name }}: [
+{% for path in stream.paths %}
+{% if loop.last %}
+{% set paths = paths + ' ' + ' ' + ' ' + ' ' + ' ' + '"' + path + '"' %}
+{{ paths }}
+{% else %}
+{% set paths = paths + ' ' + ' ' + ' ' + ' ' + ' ' + '"' + path + '"' + ',' + '\n' %}
+{% endif %}
+{% endfor %}
+    ],
+{% endfor %}
+{% if mysql_dbs is defined %}
+    mysql : [
+      '/var/lib/mysql/mysql-error.log'
+    ],
+{% endif %}
+{% if nodejs_apps is defined %}
+{% for item in nodejs_apps %}
+    '{{ item.app_name }}': [
+      '/var/log/nodejs/{{ item.app_name }}.log'
+    ],
+{% endfor %}
+{% endif %}
+{% if 'redis_servers' in group_names %}
+    redis : [
+      '/var/log/redis/redis.log'
+    ],
+{% endif %}
+{% if 'mongo_servers' in group_names %}
+    mongo : [
+      '/var/log/mongodb/mongod.log'
+    ],
+{% endif %}
+{% if 'elasticsearch_servers' in group_names %}
+    elasticsearch : [
+      '/var/log/elasticsearch/elasticsearch.log'
+    ],
+{% endif %}
+{% if tomcat_apps is defined %}
+{% for item in tomcat_apps %}
+    '{{ item.app_name }}' : [
+      '/opt/{{ item.app_name }}/logs/catalina.out'
+    ],
+{% endfor %}
+{% endif %}
+{% if nginx_sites is defined %}
+    nginx : [
+      '/var/log/nginx/error.log',
+      '/var/log/nginx/access.log'
+    ],
+{% endif %}
+{% if php_fpm_apps is defined %}
+    php_fpm: [
+      '/var/log/php-fpm/error.log',
+      '/var/log/php-fpm/www-error.log'
+    ],
+{% endif %}
+{% if httpd_vhosts is defined %}
+{% for item in httpd_vhosts %}
+    '{{ item.ServerName }}': [
+      '/var/log/httpd/{{ item.ServerName }}-error.log'
+    ],
+{% endfor %}
+    apache: [
+      '/var/log/httpd/error_log'
+    ],
+{% endif %}
+  },
+  server: {
+    host: '{{ logio_server_host }}',
+    port: {{ logio_server_port }}
+  }
+}

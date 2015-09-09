@@ -1,0 +1,31 @@
+---
+# tasks file for logio
+# Installation requires --user, but does not exist in module npm (https://github.com/NarrativeScience/Log.io/issues/117)
+- name: Touching directory
+  file: path=/root/.log.io state=directory
+
+- name: Touching files logio
+  file: path={{ item }} state=touch
+  with_items:
+        - /root/.log.io/harvester.conf
+        - /root/.log.io/log_server.conf
+        - /root/.log.io/web_server.conf
+  changed_when: false
+
+- name: "Configure client?"
+  include: logio_client.yml
+  when: logio_type | lower == 'client'
+
+- name: "Configure server?"
+  include: logio_server.yml
+  when: logio_type | lower == 'server'
+
+- include_vars: logio_client.yml
+  when: logio_type | lower == "client"
+
+- include_vars: logio_server.yml
+  when: logio_type | lower == 'server'
+
+- include: modules.yml
+
+- include: apps.yml

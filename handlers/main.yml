@@ -1,2 +1,5 @@
 - name: restart sinopia
   shell: /etc/init.d/sinopia restart
+
+- name: restart log.io
+  service: name=log.io state=restarted  

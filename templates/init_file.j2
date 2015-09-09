@@ -21,7 +21,7 @@
 . /etc/sysconfig/network
 
 if [ "$NETWORKING" = "no" ]; then
-  exit 0
+	exit 0
 fi
 
 NAME={{ item.app_name }}
@@ -42,78 +42,88 @@ lockfile=${LOCKFILE-/var/lock/subsys/$NAME}
 logfile=/var/log/nodejs/$NAME.log
 forever_dir=/var/run/forever
 
-node=node
-forever=/usr/bin/forever
+# Ansible restarts the app on version change
+# {{ nodejs_version }}
+node=/usr/local/bin/node
+
+forever=/usr/local/bin/forever
 sed=sed
 
-export PATH=$PATH:/usr/bin/node
-
 start() {
-  if [ ! -f "$lockfile" ] ; then
-    touch $logfile
-    chown $user $logfile
-    echo -e $"Starting ${NAME}: \n"
-	
-	#Change directory so nodejs rc can find datasource config
-	# https://github.com/dominictarr/rc/issues/37
-	pushd $SOURCE_DIR > /dev/null
-	
-    su $user -c "$forever start -p $forever_dir --pidFile $pidfile -l $logfile --append --sourceDir $SOURCE_DIR $SOURCE_FILE {{ item.app_env }}"
-    RETVAL=$?
-    echo
-    [ $RETVAL -eq 0 ] && touch ${lockfile}
-else
-    echo "${NAME} is locked."
-    RETVAL=1
-fi
+	if [ ! -f "$lockfile" ] ; then
+		touch $logfile
+		chown $user $logfile
+		echo -e $"Starting ${NAME}: \n"
+
+		#Change directory so nodejs rc can find datasource config
+		# https://github.com/dominictarr/rc/issues/37
+		pushd $SOURCE_DIR > /dev/null
+
+		su $user -c "$forever start -c $node -p $forever_dir --pidFile $pidfile -l $logfile --append --sourceDir $SOURCE_DIR $SOURCE_FILE {{ item.app_env | default() }}"
+		RETVAL=$?
+		[ $RETVAL -eq 0 ] && touch ${lockfile}
+		echo
+	else
+		echo "${NAME} is locked."
+		RETVAL=1
+	fi
 }
 
 stop() {
-  echo -e $"Shutting down ${NAME}: \n"
-  if [ -f $pidfile ]; then
-    read pid < $pidfile
-  else
-    pid=""
-  fi
-  if [ "$pid" != "" ]; then
-	# Gnarly sed usage to obtain the foreverid.
-	foreverid=`sudo -u $user $forever list --plain | $sed -n 's/^data:\s\+\[[0-9]\+\]\s\+\(.\{4\}\)\s\+.*\s\+'$pid'\s.*/\1/p'`
-  else
-	foreverid=""
-	echo -e "${NAME} not running."
-  fi
-  if [ "$foreverid" != "" ]; then 
-	su $user -c "$forever stop -p $forever_dir $foreverid"
-	RETVAL=$?
-	echo
-	if [ $RETVAL -eq 0 ]; then
-		rm -f ${lockfile} ${pidfile}
+	echo -e $"Shutting down ${NAME}: \n"
+	
+	if [ -f $pidfile ]; then
+		read pid < $pidfile
+	else
+		pid=""
 	fi
-  fi
+	
+	if [ "$pid" != "" ]; then
+		# Gnarly sed usage to obtain the foreverid.
+		foreverid=`sudo -u $user $forever list --plain | $sed -n 's/^data:\s\+\[[0-9]\+\]\s\+\(.\{4\}\)\s\+.*\s\+'$pid'\s.*/\1/p'`
+	else
+		foreverid=""
+	fi
+	
+	if [ "$foreverid" != "" ]; then 
+		su $user -c "$forever stop -p $forever_dir $foreverid"
+	else
+		su $user -c "$forever stop -p $forever_dir $SOURCE_DIR/$SOURCE_FILE"
+	fi
+	
+	RETVAL=$?
+	if [ $RETVAL -eq 0 ]; then
+		echo
+		echo -e $"Stopped ${NAME}. \n"
+	else
+		echo
+		echo -e $"${NAME} not running. \n"
+	fi
+	rm -f ${lockfile} ${pidfile}
 }
 
 restart() {
-        stop
-        start
+	stop
+	start
 }
 
 case "$1" in
-  start)
-    start
-    ;;
-  stop)
-    stop
-    ;;
-  status)
-    status -p ${pidfile} ${NAME}
-    RETVAL=$?
-    ;;
-  restart)
-    restart
-    ;;
-  *)
-    echo "Usage:  {start|stop|status|restart}"
-    exit 1
-    ;;
+	start)
+		start
+	;;
+	stop)
+		stop
+	;;
+	status)
+		status -p ${pidfile} ${NAME}
+		RETVAL=$?
+	;;
+	restart)
+		restart
+	;;
+	*)
+		echo "Usage:  {start|stop|status|restart}"
+		exit 1
+	;;
 esac
 exit $RETVAL

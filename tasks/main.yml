@@ -4,45 +4,60 @@
   with_items: nodejs_modules
   tags: nodejs
 
+- name: Install n to update nodejs version
+  npm: name=n global=yes state=latest
+  tags: nodejs
+
+- name: Register installed nodejs version
+  shell: node -v
+  register: nodejs_installed_version
+  changed_when: false
+  tags: nodejs
+
+- name: Install specific nodejs version
+  shell: n {{ nodejs_version }}
+  when: "{{ nodejs_installed_version.stdout | replace('v','') | version_compare(nodejs_version, 'ne') }}"
+  tags: nodejs
+
 - name: Test npm cache service registry
   command: npm config get registry
   register: registry
   when: npm_cache_server|lower != 'none' and npm_cache|lower != 'true'
   changed_when: false
-  tags: nodejs  
-  
+  tags: nodejs
+
 - name: Configure npm to use cache service
   shell: npm config set registry {{ npm_cache_server }} -g
   when: npm_cache|lower != 'true' and npm_cache_server|lower != 'none' and registry.stdout.find('{{ npm_cache_server }}') == -1
   tags: nodejs
 
-- name: Ensure latest npm is installed (the one in epel is too old)
-  npm: name=npm global=yes state=latest
-  when: nodejs_npm_modules|lower != 'none'
+- name: Ensure latest role dependencies are installed
+  npm: name={{ item }} global=yes state=latest
+  with_items:
+    - npm
+    - forever
+    - inherits
   tags: nodejs
 
-- name: Install npm modules
-  npm: name={{ item }} global=yes state=present
-  with_items: nodejs_npm_modules
-  when: nodejs_npm_modules|lower != 'none'
+- include: modules.yml
   tags: nodejs
 
 - name: Create nodejs logs directory
   file: path=/var/log/nodejs state=directory owner=root group=root mode=0755
   tags: nodejs
-  
-- name: Install inherits to remove yum nodejs-inherits package
-  npm: name=inherits global=yes state=present
-  tags: nodejs
 
 - name: Erase inherits@2 directory to avoid npm ls errors (https://bugzilla.redhat.com/show_bug.cgi?id=986422)
   file: path=/usr/lib/node_modules/inherits@2 state=absent
   tags: nodejs
-  
+
 - include: apps.yml
-  when: nodejs_apps|lower != 'none'
+  when: nodejs_apps|lower is defined
   tags: nodejs
-  
+
+- include: logio_main.yml
+  when: logio_type|lower is defined and (logio_type|lower == "client" or logio_type|lower == "server")
+  tags: [logio, nodejs]
+
 - include: npm_cache.yml
   when: npm_cache|lower == 'true'
   tags: nodejs

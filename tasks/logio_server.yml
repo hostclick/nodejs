@@ -1,0 +1,6 @@
+- name: Configure log.io server
+  template: src=web_server.conf.j2 dest=/root/.log.io/web_server.conf
+
+- name: Configure log.io server
+  template: src=log_server.conf.j2 dest=/root/.log.io/log_server.conf
+  notify: restart log.io

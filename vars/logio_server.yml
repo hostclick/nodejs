@@ -1,0 +1,9 @@
+logio_app:
+  - app_name: log.io
+    app_path: "/usr/local/bin"
+    app_index: "log.io-server"
+
+nodejs_apps: "{{ logio_app }}"
+
+nodejs_npm_modules:
+  - log.io
